@@ -106,9 +106,14 @@ class MidiController:
         if knob == FOCUS_KNOB:
             return 1 + round(value * 11)
         param = self.state.current_page().params[knob]
-        if param is not None and param.addr.endswith('/mix/pan'):
-            # Pan behaviour: 17=full left, 22=centre, 27=full right.
-            return 17 + round(value * 10)
+        if param is not None:
+            addr = param.addr
+            if '/eq/' in addr and addr.endswith('/f'):
+                # EQ frequency sweep: single-dot like focus knob.
+                return 1 + round(value * 11)
+            if addr.endswith('/mix/pan') or ('/eq/' in addr and addr.endswith('/g')):
+                # Pan / EQ gain: centre-based, 0 dB sits in the middle.
+                return 17 + round(value * 10)
         return 33 + round(value * 11)
 
     def ring_blink_worker(self):
