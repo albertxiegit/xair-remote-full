@@ -31,6 +31,8 @@ class MidiController:
     LED_OFF = 0
     LED_DIM = 20
     LED_ON = 127
+    RING_FLASH_BPM = 150.0
+    RING_FLASH_PERIOD = 5.0
 
     def __init__(self, state):
         self.state = state
@@ -117,9 +119,11 @@ class MidiController:
         return 33 + round(value * 11)
 
     def ring_blink_worker(self):
-        """Every 5 s, flash the live numeric value twice."""
+        """Every 5 s, flash the live numeric value once at ~150 BPM."""
+        beat = 60.0 / self.RING_FLASH_BPM
+        half = beat / 2.0
         while True:
-            time.sleep(5.0)
+            time.sleep(self.RING_FLASH_PERIOD)
             with self._led_lock:
                 knobs = tuple(self._ring_blink)
                 generation = self._ring_generation
@@ -132,23 +136,22 @@ class MidiController:
                     values[knob] = self.ring_cc(knob, value)
             if not values:
                 continue
-            for _ in range(2):
-                with self._led_lock:
-                    if self._ring_generation != generation:
-                        break
-                    now = time.time()
-                    for knob, cc in values.items():
-                        if now >= self._ring_user_active.get(knob, 0):
-                            self._write_ring(knob, cc)
-                time.sleep(0.06)
-                with self._led_lock:
-                    if self._ring_generation != generation:
-                        break
-                    now = time.time()
-                    for knob in values:
-                        if now >= self._ring_user_active.get(knob, 0):
-                            self._write_ring(knob, 0)
-                time.sleep(0.06)
+            with self._led_lock:
+                if self._ring_generation != generation:
+                    continue
+                now = time.time()
+                for knob, cc in values.items():
+                    if now >= self._ring_user_active.get(knob, 0):
+                        self._write_ring(knob, cc)
+            time.sleep(half)
+            with self._led_lock:
+                if self._ring_generation != generation:
+                    continue
+                now = time.time()
+                for knob in values:
+                    if now >= self._ring_user_active.get(knob, 0):
+                        self._write_ring(knob, 0)
+            time.sleep(half)
             with self._led_lock:
                 if self._ring_generation == generation:
                     for knob, cc in values.items():

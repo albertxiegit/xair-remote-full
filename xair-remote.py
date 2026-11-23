@@ -44,7 +44,7 @@ def main():
     print('Layer A: CH quick | Layer B: GATE/COMP THR + FX SEND1-4(mix7-10) + AUX SEND1+2')
     print('Knob press 1-7 (track %s):' % state.current_track_group())
     print(describe_pushes(state.current_track_group()))
-    print('Same on Layer A/B. Ring: OFF -> flashes 2x/5s | ON -> steady value\n')
+    print('Same on Layer A/B. Ring: OFF -> 1 flash @150bpm/5s | ON -> steady value\n')
 
     threading.Thread(target=xair.refresh_connection, daemon=True).start()
 
