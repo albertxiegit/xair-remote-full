@@ -32,7 +32,6 @@ class MidiController:
     LED_DIM = 20
     LED_ON = 127
     RING_FLASH_BPM = 150.0
-    RING_FLASH_PERIOD = 5.0
 
     def __init__(self, state):
         self.state = state
@@ -119,15 +118,18 @@ class MidiController:
         return 33 + round(value * 11)
 
     def ring_blink_worker(self):
-        """Every 5 s, flash the live numeric value once at ~150 BPM."""
+        """Metronome-style continuous flash of OFF knobs at ~150 BPM."""
         beat = 60.0 / self.RING_FLASH_BPM
         half = beat / 2.0
+        with self._led_lock:
+            knobs = tuple(self._ring_blink)
+            generation = self._ring_generation
         while True:
-            time.sleep(self.RING_FLASH_PERIOD)
-            with self._led_lock:
-                knobs = tuple(self._ring_blink)
-                generation = self._ring_generation
             if not knobs:
+                time.sleep(0.05)
+                with self._led_lock:
+                    knobs = tuple(self._ring_blink)
+                    generation = self._ring_generation
                 continue
             values = {}
             for knob in knobs:
@@ -135,9 +137,12 @@ class MidiController:
                 if value is not None:
                     values[knob] = self.ring_cc(knob, value)
             if not values:
+                time.sleep(0.05)
                 continue
             with self._led_lock:
                 if self._ring_generation != generation:
+                    knobs = tuple(self._ring_blink)
+                    generation = self._ring_generation
                     continue
                 now = time.time()
                 for knob, cc in values.items():
@@ -146,6 +151,8 @@ class MidiController:
             time.sleep(half)
             with self._led_lock:
                 if self._ring_generation != generation:
+                    knobs = tuple(self._ring_blink)
+                    generation = self._ring_generation
                     continue
                 now = time.time()
                 for knob in values:
@@ -153,9 +160,9 @@ class MidiController:
                         self._write_ring(knob, 0)
             time.sleep(half)
             with self._led_lock:
-                if self._ring_generation == generation:
-                    for knob, cc in values.items():
-                        self._write_ring(knob, cc)
+                if self._ring_generation != generation:
+                    knobs = tuple(self._ring_blink)
+                    generation = self._ring_generation
 
     def _write_button(self, button, velocity):
         if os.environ.get('DEBUG_LEDS'):
